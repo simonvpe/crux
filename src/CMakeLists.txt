@@ -1,10 +1,10 @@
-add_library(state-mgmt INTERFACE)
+add_library(redux INTERFACE)
 
-target_include_directories(state-mgmt INTERFACE
+target_include_directories(redux INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include/state-mgmt>)
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_PREFIX}/include/redux>)
 
-target_compile_definitions(state-mgmt
+target_compile_definitions(redux
     INTERFACE LIBRARY_HEADER_ONLY
 )
  
@@ -14,6 +14,6 @@ target_compile_definitions(state-mgmt
 #target_compile_features(pid
 #  PRIVATE cxx_std_17)
 
-install(TARGETS state-mgmt
+install(TARGETS redux
   LIBRARY DESTINATION lib
-  PUBLIC_HEADER DESTINATION include/state-mgmt)
+  PUBLIC_HEADER DESTINATION include/redux)

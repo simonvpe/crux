@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(state-mgmt LANGUAGES CXX)
+project(redux LANGUAGES CXX)
 
 # Default to building release
 if(NOT CMAKE_BUILD_TYPE)

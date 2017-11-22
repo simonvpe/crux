@@ -1,5 +1,5 @@
 #pragma once
 #include <optional>
 
-namespace state_mgmt {
+namespace redux {
 }
