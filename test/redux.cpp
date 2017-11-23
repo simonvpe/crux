@@ -42,14 +42,29 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 }  
 
 namespace redux {
+
+template<typename TState, typename TAction, typename F>
+struct reducer {
+  constexpr reducer(F&& f)
+  : f{std::forward<F>(f)}
+  {}
+
+  auto operator()(const TState& state, const TAction& action) const {
+    return f(state, action);
+  }
+  
+  const F f;
+};
+  
 template<typename TState, typename TAction, typename...Fs>
 constexpr auto make_reducer(Fs&&...f) {
-  return [f...](TState& state, TAction&& action) {
+  auto reduce = [f...](const TState& state, const TAction& action) {
     const auto next = std::visit(detail::overloaded<Fs...>{
       f...
     }, std::variant<TState>{state}, action);
     return next;
   };
+  return reducer<TState, TAction, decltype(reduce)>{std::move(reduce)};
 };
 
 template<typename...Ts>
