@@ -104,7 +104,7 @@ SCENARIO("Combine reducers") {
 }
 
 SCENARIO("Reducer") {
-  counter_state st;
+
   const auto reducer = redux::make_reducer<counter_state, counter_action>(
     [](counter_state state, up_action up) {
       state.counter += up.value;
