@@ -5,60 +5,117 @@
 #include <variant>
 #include <vector>
 #include <functional>
-
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+#include <tuple>
 
 struct up_action {
-  const int value;
+  const int value = 0;
 };
 
 struct down_action {
-  const int value;
+  const int value = 0;
 };
 
-struct mystate {
+struct counter_state {
   int counter = 0;
 };
 
-using action_t = std::variant<up_action,down_action>;
+using counter_action = std::variant<up_action,down_action>;
 
+struct todo {
+  std::string text = "";
+  bool done = 0.0f;
+};
+
+struct new_todo_action {
+  std::string text = "";
+};
+
+struct todo_state {
+  std::vector<todo> todos;
+};
+
+using todo_action = std::variant<new_todo_action>;
+
+namespace redux::detail {
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+}  
+
+namespace redux {
 template<typename TState, typename TAction, typename...Fs>
-constexpr auto reducer(Fs&&...f) {
+constexpr auto make_reducer(Fs&&...f) {
   return [f...](TState& state, TAction&& action) {
-    const auto next = std::visit(overloaded<Fs...>{
+    const auto next = std::visit(detail::overloaded<Fs...>{
       f...
     }, std::variant<TState>{state}, action);
     return next;
   };
 };
 
-SCENARIO("Reducer") {
-  mystate st;
-  const auto combined_reducer = reducer<mystate, action_t>(
-    [](mystate state, up_action up) {
+template<typename...Ts>
+struct store : std::tuple<Ts...> {
+  store(Ts...ts)
+  : std::tuple<Ts...>{ts...}
+  { }
+};
+  
+}
+
+SCENARIO("Store") {
+  using namespace redux;
+  
+  const auto counter_reducer = make_reducer<counter_state, counter_action>(
+    [](counter_state state, up_action up) {
       state.counter += up.value;
       return state;
     },
-    [](mystate state, down_action down) {
+    [](counter_state state, down_action down) {
       state.counter -= down.value;
       return state;
     }
   );
 
-  auto state = std::vector<mystate>(1);
+  const auto todo_reducer = make_reducer<todo_state, todo_action>(
+    [](todo_state state, new_todo_action n) {
+      state.todos.push_back({ .text = n.text, .done = false });
+      return state;
+    }
+  );
+
+  const auto s = store{counter_state{}, todo_state{}};
+  
+  //  const auto store = std::make_tuple(counter_state{}, todo_state{})
+  //    | counter_reducer
+  //    | todo_reducer
+  //    ;
+}
+
+SCENARIO("Reducer") {
+  counter_state st;
+  const auto reducer = redux::make_reducer<counter_state, counter_action>(
+    [](counter_state state, up_action up) {
+      state.counter += up.value;
+      return state;
+    },
+    [](counter_state state, down_action down) {
+      state.counter -= down.value;
+      return state;
+    }
+  );
+
+  auto state = std::vector<counter_state>(1);
   {
-    const auto next = combined_reducer(state.back(), {up_action{1}});
+    const auto next = reducer(state.back(), {up_action{1}});
     state.push_back( next );
     CHECK( next.counter == 1 );
   }
   {
-    const auto next = combined_reducer(state.back(), {down_action{2}});
+    const auto next = reducer(state.back(), {down_action{2}});
     state.push_back( next );
     CHECK( next.counter == -1 );
   }
   {
-    const auto next = combined_reducer(state.back(), {down_action{0}});
+    const auto next = reducer(state.back(), {down_action{0}});
     state.push_back( next );
     CHECK( next.counter == -1 );
   }   
