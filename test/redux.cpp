@@ -67,16 +67,14 @@ constexpr auto make_reducer(Fs&&...f) {
   return reducer<TState, TAction, decltype(reduce)>{std::move(reduce)};
 };
 
-template<typename...Ts>
-struct store : std::tuple<Ts...> {
-  store(Ts...ts)
-  : std::tuple<Ts...>{ts...}
-  { }
-};
-  
+template<typename...Fs>  
+constexpr auto combine_reducers(Fs...f) {
+  return std::make_tuple(std::variant<Fs...>{f}...);
 }
 
-SCENARIO("Store") {
+}
+
+SCENARIO("Combine reducers") {
   using namespace redux;
   
   const auto counter_reducer = make_reducer<counter_state, counter_action>(
@@ -97,7 +95,7 @@ SCENARIO("Store") {
     }
   );
 
-  const auto s = store{counter_state{}, todo_state{}};
+  combine_reducers(counter_reducer, todo_reducer);
   
   //  const auto store = std::make_tuple(counter_state{}, todo_state{})
   //    | counter_reducer
