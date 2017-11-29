@@ -67,7 +67,7 @@ auto combine_reducers(auto &&... fs) {
 }
 } // namespace redux
 
-SCENARIO("Combine Reducers") {
+SCENARIO("Reduce") {
   struct count_up {
     const int value = 0;
   };
