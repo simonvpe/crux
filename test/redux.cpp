@@ -2,134 +2,104 @@
 #include <doctest.h>
 #include <redux.hpp>
 
-#include <variant>
-#include <vector>
+#include <array>
 #include <functional>
 #include <tuple>
+#include <variant>
+#include <vector>
 
-struct up_action {
-  const int value = 0;
+struct A {
+  constexpr A(int v = 0) : value{v} {}
+  int value;
 };
-
-struct down_action {
-  const int value = 0;
+struct B {
+  constexpr B(int v = 0) : value{v} {}
+  int value;
 };
-
-struct counter_state {
-  int counter = 0;
-};
-
-using counter_action = std::variant<up_action,down_action>;
-
-struct todo {
-  std::string text = "";
-  bool done = 0.0f;
-};
-
-struct new_todo_action {
-  std::string text = "";
-};
-
-struct todo_state {
-  std::vector<todo> todos;
-};
-
-using todo_action = std::variant<new_todo_action>;
 
 namespace redux::detail {
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-}  
+template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> overloaded(Ts...)->overloaded<Ts...>;
+
+template <typename... Ts>
+constexpr auto unpack(const std::tuple<Ts...> &value) {
+  return std::apply(
+      [](auto &... x) { return std::array{std::variant<Ts...>{x}...}; }, value);
+}
+
+template <typename... Ts, std::size_t N>
+constexpr auto pack(const std::array<std::variant<Ts...>, N> &arr) {
+  return std::apply(
+      [](auto &... x) { return std::tuple<Ts...>{std::get<Ts>(x)...}; }, arr);
+}
+} // namespace redux::detail
 
 namespace redux {
-
-template<typename TState, typename TAction, typename F>
-struct reducer {
-  constexpr reducer(F&& f)
-  : f{std::forward<F>(f)}
-  {}
-
-  auto operator()(const TState& state, const TAction& action) const {
-    return f(state, action);
-  }
-  
-  const F f;
-};
-  
-template<typename TState, typename TAction, typename...Fs>
-constexpr auto make_reducer(Fs&&...f) {
-  auto reduce = [f...](const TState& state, const TAction& action) {
-    const auto next = std::visit(detail::overloaded<Fs...>{
-      f...
-    }, std::variant<TState>{state}, action);
-    return next;
+auto combine_reducers(auto &&... fs) {
+  return [fs...](auto state, auto action) {
+    auto unpacked = detail::unpack(state);
+    for (auto &substate : unpacked) {
+      std::visit(detail::overloaded{fs...}, substate, action);
+    }
+    // return std::make_tuple<A, B>(A{3}, B{4});
+    return detail::pack(unpacked);
   };
-  return reducer<TState, TAction, decltype(reduce)>{std::move(reduce)};
-};
+}
+} // namespace redux
 
-template<typename...Fs>  
-constexpr auto combine_reducers(Fs...f) {
-  return std::make_tuple(std::variant<Fs...>{f}...);
+SCENARIO("Combine Reducers") {
+  struct count_up {
+    constexpr count_up(int v) : value{v} {}
+    int value;
+  };
+
+  struct count_down {
+    constexpr count_down(int v) : value{v} {}
+    int value;
+  };
+
+  struct multiply {
+    constexpr multiply(int v) : value{v} {}
+    int value;
+  };
+
+  constexpr auto cstate = std::make_tuple<A, B>(A{0}, B{5});
+
+  auto reduce = redux::combine_reducers(
+      [](A &state, const count_up &action) { state.value += action.value; },
+      [](A &state, const count_down &action) { state.value -= action.value; },
+      [](B &state, const multiply &action) { state.value *= action.value; },
+      [](auto &, const auto &) {});
+
+  using V = std::variant<count_up, count_down, multiply>;
+
+  auto s1 = reduce(cstate, V{count_up{3}});
+  CHECK(std::get<A>(s1).value == 3);
+
+  auto s2 = reduce(s1, V{count_up{3}});
+  CHECK(std::get<A>(s2).value == 6);
+
+  auto s3 = reduce(s2, V{count_down{1}});
+  CHECK(std::get<A>(s3).value == 5);
+
+  auto s4 = reduce(s3, V{multiply{2}});
+  CHECK(std::get<B>(s4).value == 10);
 }
 
+SCENARIO("Pack") {
+
+  using V = std::variant<A, B>;
+  constexpr auto src = std::array{V{A{1}}, V{B{2}}};
+  constexpr auto dst = redux::detail::pack(src);
+
+  CHECK(std::get<0>(dst).value == 1);
+  CHECK(std::get<1>(dst).value == 2);
 }
 
-SCENARIO("Combine reducers") {
-  using namespace redux;
-  
-  const auto counter_reducer = make_reducer<counter_state, counter_action>(
-    [](counter_state state, up_action up) {
-      state.counter += up.value;
-      return state;
-    },
-    [](counter_state state, down_action down) {
-      state.counter -= down.value;
-      return state;
-    }
-  );
+SCENARIO("Unpack") {
+  constexpr auto src = std::make_tuple<A, B>(A{1}, B{2});
+  constexpr auto dst = redux::detail::unpack(src);
 
-  const auto todo_reducer = make_reducer<todo_state, todo_action>(
-    [](todo_state state, new_todo_action n) {
-      state.todos.push_back({ .text = n.text, .done = false });
-      return state;
-    }
-  );
-
-  combine_reducers(counter_reducer, todo_reducer);
-  
-  //  const auto store = std::make_tuple(counter_state{}, todo_state{})
-  //    | counter_reducer
-  //    | todo_reducer
-  //    ;
-}
-
-SCENARIO("Reducer") {
-
-  const auto reducer = redux::make_reducer<counter_state, counter_action>(
-    [](counter_state state, up_action up) {
-      state.counter += up.value;
-      return state;
-    },
-    [](counter_state state, down_action down) {
-      state.counter -= down.value;
-      return state;
-    }
-  );
-
-  auto state = std::vector<counter_state>(1);
-  {
-    const auto next = reducer(state.back(), {up_action{1}});
-    state.push_back( next );
-    CHECK( next.counter == 1 );
-  }
-  {
-    const auto next = reducer(state.back(), {down_action{2}});
-    state.push_back( next );
-    CHECK( next.counter == -1 );
-  }
-  {
-    const auto next = reducer(state.back(), {down_action{0}});
-    state.push_back( next );
-    CHECK( next.counter == -1 );
-  }   
+  CHECK(std::get<A>(dst[0]).value == 1);
+  CHECK(std::get<B>(dst[1]).value == 2);
 }
