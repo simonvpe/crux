@@ -85,9 +85,7 @@ struct store : std::tuple<TStates...> {
   const T &state() const { return *static_cast<const T *>(this); }
 
   void dispatch(const auto &action) {
-    const auto copies = std::get<A>(*this).copied;
     *static_cast<T *>(this) = reduce(state(), action);
-    CHECK(copies + 1 == std::get<A>(*this).copied);
   }
 
   const TReducer reduce;
