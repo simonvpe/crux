@@ -18,6 +18,11 @@ struct A {
     value = other.value;
     copied = other.copied + 1;
   }
+  A &operator=(const A &other) {
+    value = other.value;
+    copied = other.copied + 1;
+    return *this;
+  }
 };
 
 struct B {
@@ -30,39 +35,31 @@ struct B {
     value = other.value;
     copied = other.copied + 1;
   }
+  B &operator=(const B &other) {
+    value = other.value;
+    copied = other.copied + 1;
+    return *this;
+  }
 };
 
 namespace redux::detail {
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...)->overloaded<Ts...>;
-
-template <typename... Ts> constexpr auto unpack(std::tuple<Ts...> &value) {
-  return std::apply(
-      [](auto &... x) {
-        return std::array{std::variant<Ts...>{std::move(x)}...};
-      },
-      value);
-}
-
-template <typename... Ts, std::size_t N>
-constexpr auto pack(std::array<std::variant<Ts...>, N> &arr) {
-  return std::apply(
-      [](auto &... x) {
-        return std::tuple<Ts...>{std::get<Ts>(std::move(x))...};
-      },
-      arr);
-}
 } // namespace redux::detail
 
 namespace redux {
 auto combine_reducers(auto &&... fs) {
-  return [fs...](auto state, auto action) {
-    auto unpacked = detail::unpack(state);
-    for (auto &substate : unpacked) {
-      std::visit(detail::overloaded{fs...}, substate, action);
-    }
-    // return std::make_tuple<A, B>(A{3}, B{4});
-    return detail::pack(unpacked);
+  const auto dispatch = detail::overloaded{fs...};
+  return [&](const auto &state, const auto &action) {
+    const auto f = [&](const auto &s) {
+      return std::visit(
+          [&](const auto &a) -> std::remove_reference_t<decltype(s)> {
+            return std::move(dispatch(s, a));
+          },
+          action);
+    };
+    const auto g = [&](const auto &... s) { return std::make_tuple(f(s)...); };
+    return std::apply(g, state);
   };
 }
 } // namespace redux
@@ -81,10 +78,22 @@ SCENARIO("Reduce") {
   };
 
   auto reduce = redux::combine_reducers(
-      [](A &state, const count_up &action) { state.value += action.value; },
-      [](A &state, const count_down &action) { state.value -= action.value; },
-      [](B &state, const multiply &action) { state.value *= action.value; },
-      [](auto &, const auto &) {});
+      [](const A &state, const count_up &action) {
+        auto next_state = state;
+        next_state.value += action.value;
+        return next_state;
+      },
+      [](const A &state, const count_down &action) {
+        auto next_state = state;
+        next_state.value -= action.value;
+        return next_state;
+      },
+      [](const B &state, const multiply &action) {
+        auto next_state = state;
+        next_state.value *= action.value;
+        return next_state;
+      },
+      [](const auto &state, const auto &) { return state; });
 
   using V = std::variant<count_up, count_down, multiply>;
   auto s0 = std::make_tuple<A, B>(A{0}, B{5});
