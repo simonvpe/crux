@@ -1,5 +1,10 @@
 #pragma once
-#include <optional>
+
+#include <functional>
+#include <tuple>
+#include <type_traits>
+#include <variant>
+#include <vector>
 
 namespace redux::detail {
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
@@ -23,9 +28,13 @@ auto combine_reducers(auto &&... fs) {
 }
 
 template <typename TReducer, typename... TStates>
-struct store : std::tuple<TStates...> {
+class store : std::tuple<TStates...> {
   using T = std::tuple<TStates...>;
+  using TSubscriberId = int;
+  using TSubscriberFun = std::function<void()>;
+  using TSubscriber = std::pair<TSubscriberId, TSubscriberFun>;
 
+public:
   constexpr store(TReducer reducer, TStates &&... t)
       : std::tuple<TStates...>{std::forward<TStates>(t)...}, reduce{reducer} {}
 
@@ -33,8 +42,26 @@ struct store : std::tuple<TStates...> {
 
   void dispatch(const auto &action) {
     *static_cast<T *>(this) = reduce(state(), action);
+    for (const auto &sub : subscribers)
+      sub.second();
   }
 
+  auto subscribe(TSubscriberFun &&f) {
+    const auto id = next_subscriber_id++;
+    subscribers.push_back({id, std::forward<TSubscriberFun>(f)});
+    return [id, this] {
+      const auto idx =
+          std::find_if(cbegin(subscribers), cend(subscribers),
+                       [id](const auto &sub) { return sub.first == id; });
+      if (idx != cend(subscribers)) {
+        subscribers.erase(idx);
+      }
+    };
+  }
+
+private:
   const TReducer reduce;
+  std::vector<TSubscriber> subscribers = {};
+  TSubscriberId next_subscriber_id = 0;
 };
 } // namespace redux

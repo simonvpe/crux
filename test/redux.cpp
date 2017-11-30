@@ -2,10 +2,6 @@
 #include <doctest.h>
 #include <redux.hpp>
 
-#include <tuple>
-#include <type_traits>
-#include <variant>
-
 struct A {
   int value = 0;
   int copied = 0;
@@ -110,6 +106,27 @@ SCENARIO("Store") {
           "The number of times the state have been copied should increase by "
           "one") {
         CHECK(std::get<B>(store.state()).copied == 1);
+      }
+    }
+
+    WHEN("Registering a subscriber") {
+      auto subscribe_triggered = 0;
+      const auto unsubscribe =
+          store.subscribe([&] { subscribe_triggered += 1; });
+      AND_WHEN("Dispatching an action") {
+        store.dispatch(count_up{1});
+        THEN("The subscriber should be triggered once") {
+          CHECK(subscribe_triggered == 1);
+        }
+      }
+      AND_WHEN("Unsubscribing") {
+        unsubscribe();
+        AND_WHEN("Dispatching an action") {
+          store.dispatch(count_up{1});
+          THEN("The subscriber should not be triggered") {
+            CHECK(subscribe_triggered == 0);
+          }
+        }
       }
     }
   }
