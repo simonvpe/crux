@@ -67,10 +67,11 @@ auto combine_reducers(auto &&... fs) {
   const auto dispatch =
       detail::overloaded{fs..., [](auto &&s, auto &&) { return s; }};
   return [&](const auto &state, const auto &action) {
-    const auto g = [&](const auto &... s) {
-      return std::make_tuple(dispatch(s, action)...);
-    };
-    return std::apply(g, state);
+    return std::apply(
+        [&](const auto &... s) {
+          return std::make_tuple(dispatch(s, action)...);
+        },
+        state);
   };
 }
 
