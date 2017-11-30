@@ -35,8 +35,10 @@ class store : std::tuple<TStates...> {
   using TSubscriber = std::pair<TSubscriberId, TSubscriberFun>;
 
 public:
-  constexpr store(TReducer reducer, TStates &&... t)
-      : std::tuple<TStates...>{std::forward<TStates>(t)...}, reduce{reducer} {}
+  constexpr store(TReducer reducer, std::tuple<TStates...> &&initial_state)
+      : std::tuple<TStates...>{std::forward<std::tuple<TStates...>>(
+            initial_state)},
+        reduce{reducer} {}
 
   const T &state() const { return *static_cast<const T *>(this); }
 

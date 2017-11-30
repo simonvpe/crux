@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest.h>
+#include <iostream>
 #include <redux.hpp>
 
 struct A {
@@ -20,7 +21,7 @@ struct A {
 };
 
 struct B {
-  int value = 0;
+  int value = 7;
   int copied = 0;
   B(int v) : value{v} {}
   B(B &&) = default;
@@ -70,7 +71,7 @@ const auto reduce = redux::combine_reducers(
 SCENARIO("Store") {
 
   GIVEN("A redux store with two substates") {
-    auto store = redux::store{reduce, A{0}, B{7}};
+    auto store = redux::store{reduce, std::make_tuple<A, B>(0, 7)};
     REQUIRE(std::get<A>(store.state()).value == 0);
 
     WHEN("Dispatching a count_up action of 5") {
@@ -128,6 +129,23 @@ SCENARIO("Store") {
           }
         }
       }
+    }
+
+    WHEN("Adding a thunk middleware") {
+      const auto logger = [](auto &store) {
+        return [&store](auto &&next) {
+          return [&store, &next](auto &&action) {
+            std::cout << "Calling Action\n";
+            const auto result = next(action);
+            std::cout << "Action Called\n";
+            return result;
+          };
+        };
+      };
+      constexpr auto fun = [] {};
+      constexpr auto res =
+          std::is_convertible_v<std::decay_t<decltype(fun)>, void (*)()>;
+      CHECK(res);
     }
   }
 }
