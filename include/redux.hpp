@@ -27,23 +27,20 @@ auto combine_reducers(auto &&... fs) {
   };
 }
 
-template <typename TReducer, typename... TStates>
-class store : std::tuple<TStates...> {
-  using T = std::tuple<TStates...>;
+template <typename TReducer, typename TState, typename... TMiddleware>
+class store : TState {
   using TSubscriberId = int;
   using TSubscriberFun = std::function<void()>;
   using TSubscriber = std::pair<TSubscriberId, TSubscriberFun>;
 
 public:
-  constexpr store(TReducer reducer, std::tuple<TStates...> &&initial_state)
-      : std::tuple<TStates...>{std::forward<std::tuple<TStates...>>(
-            initial_state)},
-        reduce{reducer} {}
+  constexpr store(TReducer reducer, TState &&initial_state, TMiddleware... mw)
+      : TState{std::forward<TState>(initial_state)}, reduce{reducer} {}
 
-  const T &state() const { return *static_cast<const T *>(this); }
+  const TState &state() const { return *static_cast<const TState *>(this); }
 
   void dispatch(const auto &action) {
-    *static_cast<T *>(this) = reduce(state(), action);
+    *static_cast<TState *>(this) = reduce(state(), action);
     for (const auto &sub : subscribers)
       sub.second();
   }
