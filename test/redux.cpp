@@ -52,11 +52,7 @@ auto combine_reducers(auto &&... fs) {
   const auto dispatch = detail::overloaded{fs...};
   return [&](const auto &state, const auto &action) {
     const auto f = [&](const auto &s) {
-      return std::visit(
-          [&](const auto &a) -> std::remove_reference_t<decltype(s)> {
-            return std::move(dispatch(s, a));
-          },
-          action);
+      return std::move(dispatch(s, action));
     };
     const auto g = [&](const auto &... s) { return std::make_tuple(f(s)...); };
     return std::apply(g, state);
@@ -95,27 +91,26 @@ SCENARIO("Reduce") {
       },
       [](const auto &state, const auto &) { return state; });
 
-  using V = std::variant<count_up, count_down, multiply>;
   auto s0 = std::make_tuple<A, B>(A{0}, B{5});
   CHECK(std::get<A>(s0).copied == 0);
   CHECK(std::get<B>(s0).copied == 0);
 
-  auto s1 = reduce(s0, V{count_up{3}});
+  auto s1 = reduce(s0, count_up{3});
   CHECK(std::get<A>(s1).value == 3);
   CHECK(std::get<A>(s1).copied == 1);
   CHECK(std::get<B>(s1).copied == 1);
 
-  auto s2 = reduce(s1, V{count_up{3}});
+  auto s2 = reduce(s1, count_up{3});
   CHECK(std::get<A>(s2).value == 6);
   CHECK(std::get<A>(s2).copied == 2);
   CHECK(std::get<B>(s2).copied == 2);
 
-  auto s3 = reduce(s2, V{count_down{1}});
+  auto s3 = reduce(s2, count_down{1});
   CHECK(std::get<A>(s3).value == 5);
   CHECK(std::get<A>(s3).copied == 3);
   CHECK(std::get<B>(s3).copied == 3);
 
-  auto s4 = reduce(s3, V{multiply{2}});
+  auto s4 = reduce(s3, multiply{2});
   CHECK(std::get<B>(s4).value == 10);
   CHECK(std::get<A>(s4).copied == 4);
   CHECK(std::get<B>(s4).copied == 4);
