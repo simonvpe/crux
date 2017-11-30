@@ -54,44 +54,6 @@ struct multiply {
   const int value = 0;
 };
 
-namespace redux::detail {
-template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template <class... Ts> overloaded(Ts...)->overloaded<Ts...>;
-template <typename T, typename... Ts> constexpr bool contains() {
-  return std::disjunction_v<std::is_same<T, Ts>...>;
-}
-} // namespace redux::detail
-
-namespace redux {
-auto combine_reducers(auto &&... fs) {
-  const auto dispatch =
-      detail::overloaded{fs..., [](auto &&s, auto &&) { return s; }};
-  return [&](const auto &state, const auto &action) {
-    return std::apply(
-        [&](const auto &... s) {
-          return std::make_tuple(dispatch(s, action)...);
-        },
-        state);
-  };
-}
-
-template <typename TReducer, typename... TStates>
-struct store : std::tuple<TStates...> {
-  using T = std::tuple<TStates...>;
-
-  constexpr store(TReducer reducer, TStates &&... t)
-      : std::tuple<TStates...>{std::forward<TStates>(t)...}, reduce{reducer} {}
-
-  const T &state() const { return *static_cast<const T *>(this); }
-
-  void dispatch(const auto &action) {
-    *static_cast<T *>(this) = reduce(state(), action);
-  }
-
-  const TReducer reduce;
-};
-} // namespace redux
-
 const auto reduce = redux::combine_reducers(
     [](const A &state, const count_up &action) {
       auto next_state = state;
@@ -110,37 +72,45 @@ const auto reduce = redux::combine_reducers(
     });
 
 SCENARIO("Store") {
-  auto store = redux::store{reduce, A{0}, B{7}};
-  CHECK(std::get<A>(store.state()).value == 0);
 
-  store.dispatch(count_up{5});
-  CHECK(std::get<A>(store.state()).value == 5);
-  CHECK(std::get<A>(store.state()).copied == 1);
-}
+  GIVEN("A redux store with two substates") {
+    auto store = redux::store{reduce, A{0}, B{7}};
+    REQUIRE(std::get<A>(store.state()).value == 0);
 
-SCENARIO("Reduce") {
+    WHEN("Dispatching a count_up action of 5") {
+      store.dispatch(count_up{5});
+      THEN("The value of A should be increased by that amount") {
+        CHECK(std::get<A>(store.state()).value == 5);
+      }
+      AND_THEN(
+          "The number of times the state have been copied should increase by "
+          "one") {
+        CHECK(std::get<A>(store.state()).copied == 1);
+      }
+    }
 
-  auto s0 = std::make_tuple<A, B>(0, 5);
-  CHECK(std::get<A>(s0).copied == 0);
-  CHECK(std::get<B>(s0).copied == 0);
+    WHEN("Dispatching a count_down action of 2") {
+      store.dispatch(count_down{2});
+      THEN("The value of A should be decreased by that amount") {
+        CHECK(std::get<A>(store.state()).value == -2);
+      }
+      AND_THEN(
+          "The number of times the state have been copied should increase by "
+          "one") {
+        CHECK(std::get<A>(store.state()).copied == 1);
+      }
+    }
 
-  auto s1 = reduce(s0, count_up{3});
-  CHECK(std::get<A>(s1).value == 3);
-  CHECK(std::get<A>(s1).copied == 1);
-  CHECK(std::get<B>(s1).copied == 1);
-
-  auto s2 = reduce(s1, count_up{3});
-  CHECK(std::get<A>(s2).value == 6);
-  CHECK(std::get<A>(s2).copied == 2);
-  CHECK(std::get<B>(s2).copied == 2);
-
-  auto s3 = reduce(s2, count_down{1});
-  CHECK(std::get<A>(s3).value == 5);
-  CHECK(std::get<A>(s3).copied == 3);
-  CHECK(std::get<B>(s3).copied == 3);
-
-  auto s4 = reduce(s3, multiply{2});
-  CHECK(std::get<B>(s4).value == 10);
-  CHECK(std::get<A>(s4).copied == 4);
-  CHECK(std::get<B>(s4).copied == 4);
+    WHEN("Dispatching a multiply action of 10") {
+      store.dispatch(multiply{10});
+      THEN("The value of B should be multiplied by that amount") {
+        CHECK(std::get<B>(store.state()).value == 70);
+      }
+      AND_THEN(
+          "The number of times the state have been copied should increase by "
+          "one") {
+        CHECK(std::get<B>(store.state()).copied == 1);
+      }
+    }
+  }
 }
