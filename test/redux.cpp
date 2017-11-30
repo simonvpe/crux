@@ -91,7 +91,7 @@ SCENARIO("Reduce") {
       },
       [](const auto &state, const auto &) { return state; });
 
-  auto s0 = std::make_tuple<A, B>(A{0}, B{5});
+  auto s0 = std::make_tuple<A, B>(0, 5);
   CHECK(std::get<A>(s0).copied == 0);
   CHECK(std::get<B>(s0).copied == 0);
 
