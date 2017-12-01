@@ -27,22 +27,38 @@ auto combine_reducers(auto &&... fs) {
   };
 }
 
-template <typename TReducer, typename TState, typename... TMiddleware>
+template <typename TReducer, typename TState, typename... TMiddlewares>
 class store : TState {
   using TSubscriberId = int;
   using TSubscriberFun = std::function<void()>;
   using TSubscriber = std::pair<TSubscriberId, TSubscriberFun>;
+  using TMiddleware = std::tuple<TMiddlewares...>;
 
 public:
-  constexpr store(TReducer reducer, TState &&initial_state, TMiddleware... mw)
-      : TState{std::forward<TState>(initial_state)}, reduce{reducer} {}
+  constexpr store(TReducer reducer, TState &&initial_state, TMiddlewares... mw)
+      : TState{std::forward<TState>(initial_state)}, reduce{reducer},
+        middleware{mw...} {}
 
   const TState &state() const { return *static_cast<const TState *>(this); }
 
+  auto _dispatch(auto &&store_dispatch) { return store_dispatch; }
+
+  auto _dispatch(auto &&store_dispatch, auto &&mw0) {
+    return mw0(store_dispatch);
+  }
+
   void dispatch(const auto &action) {
-    *static_cast<TState *>(this) = reduce(state(), action);
-    for (const auto &sub : subscribers)
-      sub.second();
+    const auto store_dispatch = [this](decltype(action) &action) {
+      *static_cast<TState *>(this) = reduce(state(), action);
+      for (const auto &sub : subscribers)
+        sub.second();
+    };
+    const auto bound_mw = std::apply(
+        [this](auto &&... mw) { return std::make_tuple(mw(*this)...); },
+        middleware);
+
+    std::apply([&](auto &&... mw) { return _dispatch(store_dispatch, mw...); },
+               bound_mw)(action);
   }
 
   auto subscribe(TSubscriberFun &&f) {
@@ -60,6 +76,7 @@ public:
 
 private:
   const TReducer reduce;
+  const TMiddleware middleware;
   std::vector<TSubscriber> subscribers = {};
   TSubscriberId next_subscriber_id = 0;
 };

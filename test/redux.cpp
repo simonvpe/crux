@@ -68,6 +68,17 @@ const auto reduce = redux::combine_reducers(
       return next_state;
     });
 
+const auto logger = [](auto &store) {
+  return [&](auto &&next) {
+    return [&](const auto &action) {
+      std::cout << "Calling Action\n";
+      const auto result = next(action);
+      std::cout << "Action Called\n";
+      return result;
+    };
+  };
+};
+
 SCENARIO("Store") {
 
   GIVEN("A redux store with two substates") {
@@ -130,18 +141,15 @@ SCENARIO("Store") {
         }
       }
     }
+  }
+}
 
-    WHEN("Adding a thunk middleware") {
-      const auto logger = [](auto &store) {
-        return [&store](auto &&next) {
-          return [&store, &next](auto &&action) {
-            std::cout << "Calling Action\n";
-            const auto result = next(action);
-            std::cout << "Action Called\n";
-            return result;
-          };
-        };
-      };
+SCENARIO("Middleware") {
+  GIVEN("A redux store with two substates and a single middleware") {
+    auto store = redux::store{reduce, std::make_tuple<A, B>(0, 7), logger};
+    WHEN("Dispatching an action") {
+      store.dispatch(multiply{5});
+      THEN("The middleware should have been called") {}
       constexpr auto fun = [] {};
       constexpr auto res =
           std::is_convertible_v<std::decay_t<decltype(fun)>, void (*)()>;
