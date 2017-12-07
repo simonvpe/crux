@@ -9,10 +9,12 @@ struct A {
   A(int v) : value{v} {}
   A(A &&) = default;
   A(const A &other) {
+    std::cout << "  A(&)\n";
     value = other.value;
     copied = other.copied + 1;
   }
   A &operator=(const A &other) {
+    std::cout << "  operator=\n";
     value = other.value;
     copied = other.copied + 1;
     return *this;
@@ -66,10 +68,12 @@ const auto reduce = redux::combine_reducers(
       return next_state;
     });
 
-const auto logger = [](const auto &store) {
+const auto logger = [](auto &store) {
+  std::cout << "Logger\n";
   return [&](auto &&next) {
     return [&](const auto &action) -> std::remove_reference_t<decltype(store)> {
       std::cout << "Calling Action " << typeid(action).name() << "\n";
+      std::cout << "  copies (logger): " << std::get<0>(store).copied << '\n';
       return next(action);
     };
   };

@@ -42,12 +42,15 @@ public:
   const TState &state() const { return *static_cast<const TState *>(this); }
 
   void dispatch(const auto &action) {
+
     const auto store_dispatch = [this](const auto &action) {
       return reduce(state(), action);
     };
 
     *static_cast<TState *>(this) =
         std::get<0>(middleware)(state())(store_dispatch)(action);
+
+    std::cout << "  copies (final): " << std::get<0>(*this).copied << '\n';
 
     for (const auto &sub : subscribers)
       sub.second();
