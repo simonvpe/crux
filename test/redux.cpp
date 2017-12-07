@@ -53,19 +53,19 @@ struct multiply {
 
 const auto reduce = redux::combine_reducers(
     [](const A &state, const count_up &action) {
-      std::cout << "count_up{" << action.value << "}\n";
+      std::cout << "reduce count_up{" << action.value << "}\n";
       auto next_state = state;
       next_state.value += action.value;
       return next_state;
     },
     [](const A &state, const count_down &action) {
-      std::cout << "count_down{" << action.value << "}\n";
+      std::cout << "reduce count_down{" << action.value << "}\n";
       auto next_state = state;
       next_state.value -= action.value;
       return next_state;
     },
     [](const B &state, const multiply &action) {
-      std::cout << "multiply{" << action.value << "}\n";
+      std::cout << "reduce multiply{" << action.value << "}\n";
       auto next_state = state;
       next_state.value *= action.value;
       return next_state;
@@ -74,20 +74,28 @@ const auto reduce = redux::combine_reducers(
 SCENARIO("Middleware") {
   GIVEN("A redux store with two substates and a single middleware") {
 
-    const auto middleware = redux::make_middleware([&](const auto& /*store*/, auto&& next, const auto& action) {
-	std::cout << "Calling middleware\n";
-	next(count_up{5});
-	return next(action);
-      });
+    auto store = redux::store{
+        reduce, std::make_tuple<A, B>(5, 7),
+        redux::make_middleware(
+            [](const auto &, auto &&dispatch, auto &&next, const auto &action) {
+              using TAction = std::decay_t<decltype(action)>;
+              if constexpr (std::is_same_v<TAction, multiply>) {
+                dispatch(count_up{5});
+              }
+              next(action);
+            })};
 
-    auto store = redux::store{reduce, std::make_tuple<A, B>(5, 7), middleware};
     WHEN("Dispatching a multiply action") {
       store.dispatch(multiply{5});
       THEN("The value of B should have been multiplied") {
-	CHECK(std::get<B>(store).value == 35);
+        CHECK(std::get<B>(store.state()).value == 35);
       }
-      AND_THEN("The middleware should have been called (and should have counted up A)") {
-	CHECK(std::get<A>(store).value == 10);
+      AND_THEN("The middleware should have been called (and should have "
+               "counted up A)") {
+        CHECK(std::get<A>(store.state()).value == 10);
+      }
+      AND_THEN("The state should have been copied twice") {
+        CHECK(std::get<A>(store.state()).copied == 2);
       }
     }
   }
@@ -97,41 +105,41 @@ SCENARIO("Store") {
 
   GIVEN("A redux store with two substates") {
     auto store = redux::store{reduce, std::make_tuple<A, B>(0, 7)};
-    REQUIRE(std::get<A>(store).value == 0);
+    REQUIRE(std::get<A>(store.state()).value == 0);
 
     WHEN("Dispatching a count_up action of 5") {
       store.dispatch(count_up{5});
       THEN("The value of A should be increased by that amount") {
-        CHECK(std::get<A>(store).value == 5);
+        CHECK(std::get<A>(store.state()).value == 5);
       }
       AND_THEN(
           "The number of times the state have been copied should increase by "
           "one") {
-        CHECK(std::get<A>(store).copied == 1);
+        CHECK(std::get<A>(store.state()).copied == 1);
       }
     }
 
     WHEN("Dispatching a count_down action of 2") {
       store.dispatch(count_down{2});
       THEN("The value of A should be decreased by that amount") {
-        CHECK(std::get<A>(store).value == -2);
+        CHECK(std::get<A>(store.state()).value == -2);
       }
       AND_THEN(
           "The number of times the state have been copied should increase by "
           "one") {
-        CHECK(std::get<A>(store).copied == 1);
+        CHECK(std::get<A>(store.state()).copied == 1);
       }
     }
 
     WHEN("Dispatching a multiply action of 10") {
       store.dispatch(multiply{10});
       THEN("The value of B should be multiplied by that amount") {
-        CHECK(std::get<B>(store).value == 70);
+        CHECK(std::get<B>(store.state()).value == 70);
       }
       AND_THEN(
           "The number of times the state have been copied should increase by "
           "one") {
-        CHECK(std::get<B>(store).copied == 1);
+        CHECK(std::get<B>(store.state()).copied == 1);
       }
     }
 

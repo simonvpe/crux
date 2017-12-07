@@ -9,7 +9,7 @@
 namespace redux::detail {
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...)->overloaded<Ts...>;
-auto operator|(auto&& fleft, auto&& fright) { return fleft(fright); }
+auto operator|(auto &&fleft, auto &&fright) { return fleft(fright); }
 } // namespace redux::detail
 
 namespace redux {
@@ -25,18 +25,18 @@ auto combine_reducers(auto &&... fs) {
   };
 }
 
-constexpr auto make_middleware(auto&& f) {
-  return [&](const auto& store) {
-    return [&](auto&& next) {
-      return [&](const auto& action) -> std::remove_reference_t<decltype(store)> {
-	return f(store, std::forward<decltype(next)>(next), action);
+constexpr auto make_middleware(auto &&f) {
+  return [&](const auto &store, auto &&dispatch) {
+    return [&](auto &&next) {
+      return [&](const auto &action) {
+        f(store, dispatch, std::forward<decltype(next)>(next), action);
       };
     };
   };
 }
 
 template <typename TReducer, typename TState, typename... TMiddlewares>
-class store : public TState {
+class store {
   using TSubscriberId = int;
   using TSubscriberFun = std::function<void()>;
   using TSubscriber = std::pair<TSubscriberId, TSubscriberFun>;
@@ -44,20 +44,27 @@ class store : public TState {
 
 public:
   constexpr store(TReducer reducer, TState &&initial_state, TMiddlewares... mw)
-      : TState{std::forward<TState>(initial_state)}, reduce{reducer},
+      : data{std::forward<TState>(initial_state)}, reduce{reducer},
         middleware{mw...} {}
 
-  const TState &state() const { return *static_cast<const TState *>(this); }
+  const TState &state() const { return data; }
 
-  void dispatch(const auto &action) {    
+  void dispatch(const auto &action) {
     const auto store_dispatch = [this](const auto &action) {
-      return reduce(state(), action);
+      data = reduce(state(), action);
     };
 
-    *static_cast<TState*>(this) = std::apply([this, &store_dispatch](auto&&... mw) { 
-	using ::redux::detail::operator|;
-	return (mw(state()) | ... | store_dispatch);
-      }, middleware)(action);
+    const auto mw_dispatch = [this](const auto &action) { dispatch(action); };
+
+    const auto apply_middleware_and_reducer = std::apply(
+        [this, &store_dispatch, &mw_dispatch](auto &&... mw) {
+          using ::redux::detail::operator|;
+
+          return (mw(state(), mw_dispatch) | ... | store_dispatch);
+        },
+        middleware);
+
+    apply_middleware_and_reducer(action);
 
     for (const auto &sub : subscribers)
       sub.second();
@@ -77,6 +84,7 @@ public:
   }
 
 private:
+  TState data;
   const TReducer reduce;
   const TMiddleware middleware;
   std::vector<TSubscriber> subscribers = {};
