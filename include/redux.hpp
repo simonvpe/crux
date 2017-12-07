@@ -9,9 +9,7 @@
 namespace redux::detail {
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...)->overloaded<Ts...>;
-template <typename T, typename... Ts> constexpr bool contains() {
-  return std::disjunction_v<std::is_same<T, Ts>...>;
-}
+auto operator|(auto&& fleft, auto&& fright) { return fleft(fright); }
 } // namespace redux::detail
 
 namespace redux {
@@ -24,6 +22,16 @@ auto combine_reducers(auto &&... fs) {
           return std::make_tuple(dispatch(s, action)...);
         },
         state);
+  };
+}
+
+constexpr auto make_middleware(auto&& f) {
+  return [&](const auto& store) {
+    return [&](auto&& next) {
+      return [&](const auto& action) -> std::remove_reference_t<decltype(store)> {
+	return f(store, std::forward<decltype(next)>(next), action);
+      };
+    };
   };
 }
 
@@ -41,16 +49,15 @@ public:
 
   const TState &state() const { return *static_cast<const TState *>(this); }
 
-  void dispatch(const auto &action) {
-
+  void dispatch(const auto &action) {    
     const auto store_dispatch = [this](const auto &action) {
       return reduce(state(), action);
     };
 
-    *static_cast<TState *>(this) =
-        std::get<0>(middleware)(state())(store_dispatch)(action);
-
-    std::cout << "  copies (final): " << std::get<0>(*this).copied << '\n';
+    *static_cast<TState*>(this) = std::apply([this, &store_dispatch](auto&&... mw) { 
+	using ::redux::detail::operator|;
+	return (mw(state()) | ... | store_dispatch);
+      }, middleware)(action);
 
     for (const auto &sub : subscribers)
       sub.second();

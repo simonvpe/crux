@@ -53,53 +53,50 @@ struct multiply {
 
 const auto reduce = redux::combine_reducers(
     [](const A &state, const count_up &action) {
+      std::cout << "count_up{" << action.value << "}\n";
       auto next_state = state;
       next_state.value += action.value;
       return next_state;
     },
     [](const A &state, const count_down &action) {
+      std::cout << "count_down{" << action.value << "}\n";
       auto next_state = state;
       next_state.value -= action.value;
       return next_state;
     },
     [](const B &state, const multiply &action) {
+      std::cout << "multiply{" << action.value << "}\n";
       auto next_state = state;
       next_state.value *= action.value;
       return next_state;
     });
 
-const auto logger = [](auto &store) {
-  std::cout << "Logger\n";
-  return [&](auto &&next) {
-    return [&](const auto &action) -> std::remove_reference_t<decltype(store)> {
-      std::cout << "Calling Action " << typeid(action).name() << "\n";
-      std::cout << "  copies (logger): " << std::get<0>(store).copied << '\n';
-      return next(action);
-    };
-  };
-};
-
 SCENARIO("Middleware") {
   GIVEN("A redux store with two substates and a single middleware") {
-    auto store = redux::store{reduce, std::make_tuple<A, B>(0, 7), logger};
-    store.dispatch(multiply{5});
-    /*
-    WHEN("Dispatching an action") {
+
+    const auto middleware = redux::make_middleware([&](const auto& /*store*/, auto&& next, const auto& action) {
+	std::cout << "Calling middleware\n";
+	next(count_up{5});
+	return next(action);
+      });
+
+    auto store = redux::store{reduce, std::make_tuple<A, B>(5, 7), middleware};
+    WHEN("Dispatching a multiply action") {
       store.dispatch(multiply{5});
-      THEN("The middleware should have been called") {}
-      constexpr auto fun = [] {};
-      constexpr auto res =
-          std::is_convertible_v<std::decay_t<decltype(fun)>, void (*)()>;
-      CHECK(res);
+      THEN("The value of B should have been multiplied") {
+	CHECK(std::get<B>(store).value == 35);
+      }
+      AND_THEN("The middleware should have been called (and should have counted up A)") {
+	CHECK(std::get<A>(store).value == 10);
+      }
     }
-    */
   }
 }
 
 SCENARIO("Store") {
 
   GIVEN("A redux store with two substates") {
-    auto store = redux::store{reduce, std::make_tuple<A, B>(0, 7), logger};
+    auto store = redux::store{reduce, std::make_tuple<A, B>(0, 7)};
     REQUIRE(std::get<A>(store).value == 0);
 
     WHEN("Dispatching a count_up action of 5") {
