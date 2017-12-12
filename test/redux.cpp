@@ -84,7 +84,6 @@ SCENARIO("Middleware") {
               }
               next(action);
             })};
-
     WHEN("Dispatching a multiply action") {
       store.dispatch(multiply{5});
       THEN("The value of B should have been multiplied") {
@@ -99,6 +98,33 @@ SCENARIO("Middleware") {
       }
     }
   }
+  /*
+  GIVEN("A redux store with two substates and a two middlewares") {
+
+    auto store = redux::store{
+        reduce, std::make_tuple<A, B>(5, 7),
+        redux::make_middleware(
+            [](const auto &, auto &&dispatch, auto &&next, const auto &action) {
+              using TAction = std::decay_t<decltype(action)>;
+              std::cout << "MW1\n";
+              if constexpr (std::is_same_v<TAction, multiply>) {
+                dispatch(count_up{5});
+              }
+              next(action);
+            }),
+        redux::make_middleware(
+            [](const auto &, auto &&dispatch, auto &&next, const auto &action) {
+              std::cout << "MW2\n";
+              using TAction = std::decay_t<decltype(action)>;
+              if constexpr (std::is_same_v<TAction, multiply>) {
+                dispatch(count_up{5});
+              }
+              next(action);
+            })};
+
+    store.dispatch(multiply{10});
+  }
+  */
 }
 
 SCENARIO("Store") {

@@ -1,5 +1,16 @@
 #pragma once
 
+template <typename T, typename U> auto operator|(T &&left, U &&right) {
+  return left(right);
+}
+
+template <typename T> auto chain_middleware(T &&f) { return f; }
+
+template <typename T, typename... U>
+auto chain_middleware(T &&f, U &&... rest) {
+  return f(chain_middleware(rest...));
+}
+
 #include <functional>
 #include <tuple>
 #include <type_traits>
@@ -7,13 +18,15 @@
 #include <vector>
 
 namespace redux::detail {
-template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template <class... Ts> overloaded(Ts...)->overloaded<Ts...>;
-auto operator|(auto &&fleft, auto &&fright) { return fleft(fright); }
+template <typename... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+template <typename... Ts> overloaded(Ts...)->overloaded<Ts...>;
 } // namespace redux::detail
 
 namespace redux {
-auto combine_reducers(auto &&... fs) {
+
+template <typename... T> auto combine_reducers(T &&... fs) {
   const auto dispatch =
       detail::overloaded{fs..., [](auto &&s, auto &&) { return s; }};
   return [&](const auto &state, const auto &action) {
@@ -25,7 +38,7 @@ auto combine_reducers(auto &&... fs) {
   };
 }
 
-constexpr auto make_middleware(auto &&f) {
+template <typename T> constexpr auto make_middleware(T &&f) {
   return [&](const auto &store, auto &&dispatch) {
     return [&](auto &&next) {
       return [&](const auto &action) {
@@ -49,22 +62,19 @@ public:
 
   const TState &state() const { return data; }
 
-  void dispatch(const auto &action) {
-    const auto store_dispatch = [this](const auto &action) {
-      data = reduce(state(), action);
+  template <typename T> void dispatch(const T &action) {
+    auto store_dispatch = [this](const auto &action) {
+      this->data = this->reduce(this->data, action);
     };
 
-    const auto mw_dispatch = [this](const auto &action) { dispatch(action); };
+    auto mw_dispatch = [this](const auto &action) { this->dispatch(action); };
 
-    const auto apply_middleware_and_reducer = std::apply(
-        [this, &store_dispatch, &mw_dispatch](auto &&... mw) {
-          using ::redux::detail::operator|;
-
-          return (mw(state(), mw_dispatch) | ... | store_dispatch);
+    std::apply(
+        [this, store_dispatch, mw_dispatch](auto &&... mw) {
+          return chain_middleware(mw(this->data, mw_dispatch)...,
+                                  store_dispatch);
         },
-        middleware);
-
-    apply_middleware_and_reducer(action);
+        middleware)(action);
 
     for (const auto &sub : subscribers)
       sub.second();
