@@ -7,7 +7,7 @@
 struct A {
   int value = 0;
   int copied = 0;
-  A(int v) : value{v} {}
+  A(int v, int c = 0) : value{v}, copied{c} {}
   A(A &&) = default;
   A(const A &other) {
     std::cout << "  A(&)\n";
@@ -26,7 +26,7 @@ struct A {
 struct B {
   int value = 7;
   int copied = 0;
-  B(int v) : value{v} {}
+  B(int v, int c = 0) : value{v}, copied{c} {}
   B(B &&) = default;
   B(const B &other) {
     value = other.value;
@@ -54,22 +54,13 @@ struct multiply {
 
 const auto reduce = redux::combine_reducers(
     [](const A &state, const count_up &action) {
-      std::cout << "reduce count_up{" << action.value << "}\n";
-      auto next_state = state;
-      next_state.value += action.value;
-      return next_state;
+      return A{state.value + action.value, state.copied + 1};
     },
     [](const A &state, const count_down &action) {
-      std::cout << "reduce count_down{" << action.value << "}\n";
-      auto next_state = state;
-      next_state.value -= action.value;
-      return next_state;
+      return A{state.value - action.value, state.copied + 1};
     },
     [](const B &state, const multiply &action) {
-      std::cout << "reduce multiply{" << action.value << "}\n";
-      auto next_state = state;
-      next_state.value *= action.value;
-      return next_state;
+      return B{state.value * action.value, state.copied + 1};
     });
 
 SCENARIO("Thunk Middleware") {
