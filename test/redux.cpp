@@ -75,11 +75,10 @@ SCENARIO("Thunk Middleware") {
       store.dispatch([&](auto &&dispatch, const auto &state) { call_count++; });
       THEN("The call count should increase") { CHECK(call_count == 1); }
     }
-
     WHEN("Dispatching an single async action") {
       store
           .dispatch([](auto &&dispatch, const auto &state) {
-            return std::async(std::launch::async, [&] {
+            return std::async(std::launch::async, [=] {
               std::this_thread::sleep_for(10ms);
               dispatch(count_up{5});
             });
