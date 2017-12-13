@@ -146,6 +146,9 @@ SCENARIO("Middleware") {
         CHECK(std::get<A>(store.state()).value == 9);
         CHECK(std::get<B>(store.state()).value == 70);
       }
+      AND_THEN("There should be no excessive copying") {
+        CHECK(std::get<A>(store.state()).copied == 3);
+      }
     }
   }
 }
