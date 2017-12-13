@@ -1,6 +1,8 @@
 #pragma once
 #include "../redux.hpp"
 
+#include <future>
+
 namespace redux {
 
 const auto thunk = redux::make_middleware(

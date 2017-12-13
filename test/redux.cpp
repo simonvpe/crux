@@ -74,6 +74,20 @@ SCENARIO("Thunk Middleware") {
       store.dispatch([&](auto &&dispatch, const auto &state) { call_count++; });
       THEN("The call count should increase") { CHECK(call_count == 1); }
     }
+
+    WHEN("Dispatching an async action") {
+      using namespace std::chrono_literals;
+      store.dispatch([](auto &&dispatch, const auto &state) {
+        std::async(std::launch::async, [&] {
+          std::this_thread::sleep_for(100ms);
+          dispatch(count_up{5});
+        });
+      });
+      THEN("It should dispatch within 200ms") {
+        std::this_thread::sleep_for(200ms);
+        CHECK(std::get<A>(store.state()).value == 10);
+      }
+    }
   }
 }
 
