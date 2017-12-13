@@ -41,7 +41,8 @@ template <typename... T> auto combine_reducers(T &&... fs) {
 template <typename T> constexpr auto make_middleware(T &&f) {
   return [=](const auto &store, auto &&dispatch) {
     return [=](auto next) {
-      return [=](const auto &action) { f(store, dispatch, next, action); };
+      return
+          [=](const auto &action) { return f(store, dispatch, next, action); };
     };
   };
 }
@@ -60,22 +61,32 @@ public:
 
   const TState &state() const { return data; }
 
-  template <typename T> void dispatch(const T &action) {
-    auto store_dispatch = [this](const auto &action) {
-      this->data = this->reduce(this->data, action);
+  template <typename T> auto dispatch(const T &action) {
+    auto store_dispatch = [=](const auto &action) {
+      data = reduce(data, action);
     };
 
-    auto mw_dispatch = [this](const auto &action) { this->dispatch(action); };
+    auto mw_dispatch = [=](const auto &action) { dispatch(action); };
 
-    std::apply(
-        [this, store_dispatch, mw_dispatch](auto &&... mw) {
-          return chain_middleware(mw(this->data, mw_dispatch)...,
-                                  store_dispatch);
-        },
-        middleware)(action);
+    auto all_dispatch = [=](const auto &action) {
+      return std::apply(
+          [=](auto &&... mw) {
+            return chain_middleware(mw(this->data, mw_dispatch)...,
+                                    store_dispatch);
+          },
+          middleware)(action);
+    };
 
-    for (const auto &sub : subscribers)
-      sub.second();
+    if constexpr (std::is_same_v<decltype(all_dispatch(action)), void>) {
+      all_dispatch(action);
+      for (const auto &sub : subscribers)
+        sub.second();
+    } else {
+      auto result = all_dispatch(action);
+      for (const auto &sub : subscribers)
+        sub.second();
+      return result;
+    }
   }
 
   auto subscribe(TSubscriberFun &&f) {

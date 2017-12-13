@@ -65,6 +65,7 @@ const auto reduce = redux::combine_reducers(
 
 SCENARIO("Thunk Middleware") {
   GIVEN("A redux store with one substate and a thunk middleware") {
+    using namespace std::chrono_literals;
 
     auto store =
         redux::store{reduce, std::make_tuple<A, B>(5, 7), redux::thunk};
@@ -73,6 +74,20 @@ SCENARIO("Thunk Middleware") {
       auto call_count = 0;
       store.dispatch([&](auto &&dispatch, const auto &state) { call_count++; });
       THEN("The call count should increase") { CHECK(call_count == 1); }
+    }
+
+    WHEN("Dispatching an single async action") {
+      store
+          .dispatch([](auto &&dispatch, const auto &state) {
+            return std::async(std::launch::async, [&] {
+              std::this_thread::sleep_for(10ms);
+              dispatch(count_up{5});
+            });
+          })
+          .wait();
+      THEN("It should have fired an action") {
+        CHECK(std::get<A>(store.state()).value == 10);
+      }
     }
   }
 }
