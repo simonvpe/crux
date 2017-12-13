@@ -39,11 +39,9 @@ template <typename... T> auto combine_reducers(T &&... fs) {
 }
 
 template <typename T> constexpr auto make_middleware(T &&f) {
-  return [&](const auto &store, auto &&dispatch) {
-    return [&](auto &&next) {
-      return [&](const auto &action) {
-        f(store, dispatch, std::forward<decltype(next)>(next), action);
-      };
+  return [=](const auto &store, auto &&dispatch) {
+    return [=](auto next) {
+      return [=](const auto &action) { f(store, dispatch, next, action); };
     };
   };
 }

@@ -98,7 +98,7 @@ SCENARIO("Middleware") {
       }
     }
   }
-  /*
+
   GIVEN("A redux store with two substates and a two middlewares") {
 
     auto store = redux::store{
@@ -106,7 +106,6 @@ SCENARIO("Middleware") {
         redux::make_middleware(
             [](const auto &, auto &&dispatch, auto &&next, const auto &action) {
               using TAction = std::decay_t<decltype(action)>;
-              std::cout << "MW1\n";
               if constexpr (std::is_same_v<TAction, multiply>) {
                 dispatch(count_up{5});
               }
@@ -114,17 +113,21 @@ SCENARIO("Middleware") {
             }),
         redux::make_middleware(
             [](const auto &, auto &&dispatch, auto &&next, const auto &action) {
-              std::cout << "MW2\n";
               using TAction = std::decay_t<decltype(action)>;
-              if constexpr (std::is_same_v<TAction, multiply>) {
-                dispatch(count_up{5});
+              if constexpr (std::is_same_v<TAction, count_up>) {
+                dispatch(count_down{1});
               }
               next(action);
             })};
 
-    store.dispatch(multiply{10});
+    WHEN("Dispatching a multiply action") {
+      store.dispatch(multiply{10});
+      THEN("The middlewares should do their thing") {
+        CHECK(std::get<A>(store.state()).value == 9);
+        CHECK(std::get<B>(store.state()).value == 70);
+      }
+    }
   }
-  */
 }
 
 SCENARIO("Store") {
