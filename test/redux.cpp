@@ -102,7 +102,7 @@ SCENARIO("Middleware") {
               if constexpr (std::is_same_v<TAction, multiply>) {
                 dispatch(count_up{5});
               }
-              next(action);
+              return next(action);
             })};
     WHEN("Dispatching a multiply action") {
       store.dispatch(multiply{5});
@@ -129,7 +129,7 @@ SCENARIO("Middleware") {
               if constexpr (std::is_same_v<TAction, multiply>) {
                 dispatch(count_up{5});
               }
-              next(action);
+              return next(action);
             }),
         redux::make_middleware(
             [](const auto &, auto &&dispatch, auto &&next, const auto &action) {
@@ -137,7 +137,7 @@ SCENARIO("Middleware") {
               if constexpr (std::is_same_v<TAction, count_up>) {
                 dispatch(count_down{1});
               }
-              next(action);
+              return next(action);
             })};
 
     WHEN("Dispatching a multiply action") {
