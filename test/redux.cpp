@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest.h>
 #include <iostream>
+#include <middleware/thunk.hpp>
 #include <redux.hpp>
 
 struct A {
@@ -70,6 +71,20 @@ const auto reduce = redux::combine_reducers(
       next_state.value *= action.value;
       return next_state;
     });
+
+SCENARIO("Thunk Middleware") {
+  GIVEN("A redux store with one substate and a thunk middleware") {
+
+    auto store =
+        redux::store{reduce, std::make_tuple<A, B>(5, 7), redux::thunk};
+
+    WHEN("Dispatching a callable") {
+      auto call_count = 0;
+      store.dispatch([&](auto &&dispatch, const auto &state) { call_count++; });
+      THEN("The call count should increase") { CHECK(call_count == 1); }
+    }
+  }
+}
 
 SCENARIO("Middleware") {
   GIVEN("A redux store with two substates and a single middleware") {

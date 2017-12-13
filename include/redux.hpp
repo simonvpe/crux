@@ -1,5 +1,11 @@
 #pragma once
 
+#include <functional>
+#include <tuple>
+#include <type_traits>
+#include <variant>
+#include <vector>
+
 template <typename T, typename U> auto operator|(T &&left, U &&right) {
   return left(right);
 }
@@ -10,12 +16,6 @@ template <typename T, typename... U>
 auto chain_middleware(T &&f, U &&... rest) {
   return f(chain_middleware(rest...));
 }
-
-#include <functional>
-#include <tuple>
-#include <type_traits>
-#include <variant>
-#include <vector>
 
 namespace redux::detail {
 template <typename... Ts> struct overloaded : Ts... {
