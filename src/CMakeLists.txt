@@ -1,3 +1,5 @@
+find_package(Threads)
+
 add_library(redux INTERFACE)
 
 target_include_directories(redux INTERFACE
@@ -8,6 +10,8 @@ target_compile_definitions(redux
     INTERFACE LIBRARY_HEADER_ONLY
 )
  
+target_link_libraries(redux INTERFACE ${CMAKE_THREAD_LIBS_INIT})
+
 #set_target_properties(pid
 #  PROPERTIES PUBLIC_HEADER ${CMAKE_SOURCE_DIR}/include/pid.hpp)
 
