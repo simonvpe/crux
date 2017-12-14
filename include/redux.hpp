@@ -6,9 +6,12 @@
 #include <variant>
 #include <vector>
 
-template <typename T, typename U> auto operator|(T &&left, U &&right) {
-  return left(right);
-}
+namespace redux::detail {
+
+template <typename... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+template <typename... Ts> overloaded(Ts...)->overloaded<Ts...>;
 
 template <typename T> auto chain_middleware(T &&f) { return f; }
 
@@ -17,11 +20,6 @@ auto chain_middleware(T &&f, U &&... rest) {
   return f(chain_middleware(rest...));
 }
 
-namespace redux::detail {
-template <typename... Ts> struct overloaded : Ts... {
-  using Ts::operator()...;
-};
-template <typename... Ts> overloaded(Ts...)->overloaded<Ts...>;
 } // namespace redux::detail
 
 namespace redux {
@@ -71,8 +69,8 @@ public:
     auto all_dispatch = [=](const auto &action) {
       return std::apply(
           [=](auto &&... mw) {
-            return chain_middleware(mw(this->data, mw_dispatch)...,
-                                    store_dispatch);
+            return detail::chain_middleware(mw(this->data, mw_dispatch)...,
+                                            store_dispatch);
           },
           middleware)(action);
     };
